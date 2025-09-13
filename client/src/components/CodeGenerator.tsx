@@ -15,7 +15,7 @@ export default function CodeGenerator() {
     if (!prompt.trim()) return;
     
     setIsLoading(true);
-    console.log(`Generating code using ${isAdvanced ? 'DeepSeek V3.1' : 'NVIDIA Nemotron Nano 9B V2'}`);
+    console.log(`Generating code using ${isAdvanced ? 'Advanced' : 'Normal'} mode`);
     console.log("Prompt:", prompt);
     
     // TODO: Replace with actual API call to OpenRouter
@@ -167,7 +167,7 @@ Examples:
 
         {/* Footer */}
         <div className="mt-12 text-center text-sm text-muted-foreground">
-          <p>Powered by NVIDIA Nemotron Nano 9B V2 and DeepSeek V3.1</p>
+          <p>Powered by advanced AI technology</p>
         </div>
       </div>
     </div>

@@ -27,9 +27,6 @@ export default function ModeToggle({ isAdvanced, onToggle }: ModeToggleProps) {
         <Label className="text-sm font-medium">Advanced Mode</Label>
       </div>
       
-      <div className="ml-4 text-xs text-muted-foreground">
-        {isAdvanced ? "DeepSeek V3.1" : "NVIDIA Nemotron Nano 9B V2"}
-      </div>
     </div>
   );
 }
