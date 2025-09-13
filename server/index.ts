@@ -1,86 +1,83 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import dotenv from "dotenv";
+
+dotenv.config({ path: ".env.local" });
 
 const app = express();
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+// Logging middleware for API routes
+app.use((req: Request, res: Response, next: NextFunction) => {
+    const start = Date.now();
+    const path = req.path;
+    let capturedJsonResponse: Record<string, any> | undefined;
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
+    const originalResJson = res.json.bind(res);
+    res.json = (bodyJson: any, ...args: any[]) => {
+        capturedJsonResponse = bodyJson;
+        return originalResJson(bodyJson, ...args);
+    };
 
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
+    res.on("finish", () => {
+        const duration = Date.now() - start;
+        if (path.startsWith("/api")) {
+            let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+            if (capturedJsonResponse) {
+                logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+            }
+            if (logLine.length > 80) {
+                logLine = logLine.slice(0, 79) + "…";
+            }
+            log(logLine);
+        }
+    });
 
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
+    next();
 });
 
 (async () => {
-  // Validate single API key at startup
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  
-  if (!apiKey) {
-    console.error("❌ OPENROUTER_API_KEY is not configured");
-    console.error("Please set the OpenRouter API key for both Normal and Advanced modes");
-    console.error("Normal mode: NVIDIA Nemotron Nano 9B V2");
-    console.error("Advanced mode: DeepSeek R1 (with reasoning)");
-    process.exit(1);
-  }
-  
-  console.log("✅ API key validated successfully");
-  console.log("📍 Normal mode: NVIDIA Nemotron Nano 9B V2");
-  console.log("🧠 Advanced mode: DeepSeek R1 (with reasoning)");
-  
-  const server = await registerRoutes(app);
+    // Validate API key at startup
+    const apiKey = process.env.OPENROUTER_API_KEY;
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    if (!apiKey) {
+        console.error("❌ OPENROUTER_API_KEY is not configured");
+        console.error("Please set the OpenRouter API key for both Normal and Advanced modes");
+        console.error("Normal mode: NVIDIA Nemotron Nano 9B V2");
+        console.error("Advanced mode: DeepSeek R1 (with reasoning)");
+        process.exit(1);
+    }
 
-    res.status(status).json({ message });
-    throw err;
-  });
+    console.log("✅ API key validated successfully");
+    console.log("📍 Normal mode: NVIDIA Nemotron Nano 9B V2");
+    console.log("🧠 Advanced mode: DeepSeek R1 (with reasoning)");
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+    const server = await registerRoutes(app);
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
+    // Global error handler
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+        const status = err.status || err.statusCode || 500;
+        const message = err.message || "Internal Server Error";
+        res.status(status).json({ message });
+        console.error("Unhandled error:", err);
+    });
+
+    // Setup Vite only in development
+    if (app.get("env") === "development") {
+        await setupVite(app, server);
+    } else {
+        serveStatic(app);
+    }
+
+    // Always use PORT from env (default 5000)
+    const port = parseInt(process.env.PORT || "5000", 10);
+    const host = "0.0.0.0";
+
+    // ✅ Fix: removed `reusePort: true` (not supported on Windows)
+    server.listen(port, host, () => {
+        log(`🚀 Server running on http://${host}:${port}`);
+    });
 })();
