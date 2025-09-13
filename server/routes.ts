@@ -50,17 +50,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(response);
       }
 
-      // Select API key and model based on mode
-      const apiKey = mode === "advanced" ? 
-        process.env.OPENROUTER_ADVANCED_API_KEY : 
-        process.env.OPENROUTER_NORMAL_API_KEY;
+      // Use single API key for both modes, select model based on mode
+      const apiKey = process.env.OPENROUTER_API_KEY;
       
       const model = mode === "advanced" ? 
         "deepseek/deepseek-r1" : 
         "nvidia/nemotron-nano-9b-v2";
 
       if (!apiKey) {
-        throw new Error(`API key not configured for ${mode} mode`);
+        throw new Error("OPENROUTER_API_KEY is not configured");
       }
 
       // Prepare OpenRouter request

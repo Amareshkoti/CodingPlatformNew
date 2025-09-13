@@ -37,23 +37,18 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Validate API keys at startup
-  const normalApiKey = process.env.OPENROUTER_NORMAL_API_KEY;
-  const advancedApiKey = process.env.OPENROUTER_ADVANCED_API_KEY;
+  // Validate single API key at startup
+  const apiKey = process.env.OPENROUTER_API_KEY;
   
-  if (!normalApiKey) {
-    console.error("❌ OPENROUTER_NORMAL_API_KEY is not configured");
-    console.error("Please set the API key for Normal mode (NVIDIA Nemotron Nano 9B V2)");
+  if (!apiKey) {
+    console.error("❌ OPENROUTER_API_KEY is not configured");
+    console.error("Please set the OpenRouter API key for both Normal and Advanced modes");
+    console.error("Normal mode: NVIDIA Nemotron Nano 9B V2");
+    console.error("Advanced mode: DeepSeek R1 (with reasoning)");
     process.exit(1);
   }
   
-  if (!advancedApiKey) {
-    console.error("❌ OPENROUTER_ADVANCED_API_KEY is not configured");
-    console.error("Please set the API key for Advanced mode (DeepSeek R1)");
-    process.exit(1);
-  }
-  
-  console.log("✅ API keys validated successfully");
+  console.log("✅ API key validated successfully");
   console.log("📍 Normal mode: NVIDIA Nemotron Nano 9B V2");
   console.log("🧠 Advanced mode: DeepSeek R1 (with reasoning)");
   
