@@ -2,6 +2,36 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { generateCodeSchema, type GenerateCodeRequest, type CodeResponse } from "@shared/schema";
 
+// Function to extract clean code from AI response
+function extractCleanCode(rawResponse: string): string {
+  if (!rawResponse) return "";
+  
+  // Remove leading/trailing whitespace
+  let cleaned = rawResponse.trim();
+  
+  // Extract code from markdown code blocks (```language or ```)
+  const codeBlockRegex = /```(?:\w+)?\s*\n?([\s\S]*?)\n?```/g;
+  const match = codeBlockRegex.exec(cleaned);
+  
+  if (match && match[1]) {
+    // Found code block, extract the code inside
+    cleaned = match[1].trim();
+  } else {
+    // No code blocks found, check if it starts with explanation text
+    // Remove common explanation patterns that the model might add
+    cleaned = cleaned
+      .replace(/^.*?Here'?s.*?code.*?:?\s*/im, '') // "Here's the code:"
+      .replace(/^.*?This is.*?code.*?:?\s*/im, '') // "This is the code:"
+      .replace(/^.*?Below is.*?code.*?:?\s*/im, '') // "Below is the code:"
+      .replace(/^.*?The code is.*?:?\s*/im, '') // "The code is:"
+      .replace(/^.*?Solution.*?:?\s*/im, '') // "Solution:"
+      .trim();
+  }
+  
+  // Remove leading/trailing newlines and whitespace
+  return cleaned;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Code generation endpoint
   app.post("/api/generate-code", async (req, res) => {
@@ -57,11 +87,11 @@ User request: ${prompt}`
         openRouterPayload.messages = [
           {
             role: "system",
-            content: "You are an expert programmer. Generate clean, well-commented code based on the user's request. Only return the code, no additional explanation unless asked."
+            content: "You are an expert programmer. Generate ONLY executable code. Do not include any explanations, reasoning, commentary, or markdown formatting. Return just the raw code that can be run directly."
           },
           {
             role: "user",
-            content: prompt
+            content: `${prompt}\n\nIMPORTANT: Return ONLY the executable code. No explanations, no comments, no markdown code blocks, no reasoning. Just the raw code.`
           }
         ];
       }
@@ -95,10 +125,20 @@ User request: ${prompt}`
 
       let generatedCode = data.choices[0].message.content;
       
-      // Handle NVIDIA Nemotron model that puts content in reasoning field
-      if (!generatedCode && data.choices[0].message.reasoning) {
-        console.log("Content empty, using reasoning field from NVIDIA model");
-        generatedCode = data.choices[0].message.reasoning;
+      // For Normal mode, only use content field and extract clean code
+      if (mode === "normal") {
+        // Don't use reasoning field for normal mode as it contains explanations
+        if (!generatedCode) {
+          throw new Error("No code generated in normal mode");
+        }
+        // Extract code from markdown code blocks if present
+        generatedCode = extractCleanCode(generatedCode);
+      } else {
+        // For Advanced mode, use reasoning field as fallback if content is empty
+        if (!generatedCode && data.choices[0].message.reasoning) {
+          console.log("Content empty, using reasoning field from Advanced model");
+          generatedCode = data.choices[0].message.reasoning;
+        }
       }
       
       console.log("Generated code length:", generatedCode ? generatedCode.length : 0);
