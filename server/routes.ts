@@ -26,8 +26,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         process.env.OPENROUTER_NORMAL_API_KEY;
       
       const model = mode === "advanced" ? 
-        "deepseek/deepseek-chat" : 
-        "nvidia/nemotron-4-340b-instruct";
+        "deepseek/deepseek-r1" : 
+        "nvidia/nemotron-nano-9b-v2";
 
       if (!apiKey) {
         throw new Error(`API key not configured for ${mode} mode`);
@@ -36,7 +36,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Prepare OpenRouter request
       const openRouterPayload: any = {
         model,
-        messages: [
+        messages: [],
+        max_tokens: 1500,
+        temperature: mode === "advanced" ? 0.6 : 0.1  // DeepSeek R1 performs better at 0.6, NVIDIA at 0.1
+      };
+
+      // Configure messages based on model type
+      if (mode === "advanced") {
+        // DeepSeek R1 - no system prompt recommended, all instructions in user prompt
+        openRouterPayload.messages = [
+          {
+            role: "user",
+            content: `You are an expert programmer. Generate clean, well-commented code based on the user's request. Only return the code, no additional explanation unless asked.
+
+User request: ${prompt}`
+          }
+        ];
+      } else {
+        // NVIDIA Nemotron Nano 9B V2 - uses traditional system/user prompt structure
+        openRouterPayload.messages = [
           {
             role: "system",
             content: "You are an expert programmer. Generate clean, well-commented code based on the user's request. Only return the code, no additional explanation unless asked."
@@ -45,14 +63,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             role: "user",
             content: prompt
           }
-        ],
-        max_tokens: 1500,
-        temperature: 0.1
-      };
-
-      // Add reasoning for advanced mode (DeepSeek)
-      if (mode === "advanced") {
-        openRouterPayload.reasoning = true;
+        ];
       }
 
       // Make request to OpenRouter
@@ -70,7 +81,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!response.ok) {
         const errorData = await response.text();
         console.error("OpenRouter API error:", response.status, errorData);
-        throw new Error(`OpenRouter API error: ${response.status}`);
+        console.error("Request payload was:", JSON.stringify(openRouterPayload, null, 2));
+        throw new Error(`OpenRouter API error: ${response.status} - ${errorData}`);
       }
 
       const data = await response.json();
