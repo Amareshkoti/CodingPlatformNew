@@ -37,7 +37,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const openRouterPayload: any = {
         model,
         messages: [],
-        max_tokens: 1500,
+        max_tokens: 200,
         temperature: mode === "advanced" ? 0.6 : 0.1  // DeepSeek R1 performs better at 0.6, NVIDIA at 0.1
       };
 
@@ -86,12 +86,23 @@ User request: ${prompt}`
       }
 
       const data = await response.json();
+      console.log("OpenRouter response data:", JSON.stringify(data, null, 2));
       
       if (!data.choices || data.choices.length === 0) {
+        console.error("No choices in response:", data);
         throw new Error("No response from AI model");
       }
 
-      const generatedCode = data.choices[0].message.content;
+      let generatedCode = data.choices[0].message.content;
+      
+      // Handle NVIDIA Nemotron model that puts content in reasoning field
+      if (!generatedCode && data.choices[0].message.reasoning) {
+        console.log("Content empty, using reasoning field from NVIDIA model");
+        generatedCode = data.choices[0].message.reasoning;
+      }
+      
+      console.log("Generated code length:", generatedCode ? generatedCode.length : 0);
+      console.log("Generated code preview:", generatedCode ? generatedCode.substring(0, 100) + "..." : "EMPTY");
       
       // Detect language from the generated code
       let language = "javascript";
