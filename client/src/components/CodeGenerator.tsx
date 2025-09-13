@@ -18,78 +18,34 @@ export default function CodeGenerator() {
     console.log(`Generating code using ${isAdvanced ? 'Advanced' : 'Normal'} mode`);
     console.log("Prompt:", prompt);
     
-    // TODO: Replace with actual API call to OpenRouter
-    // Simulate API delay and response
-    setTimeout(() => {
-      const mockCode = generateMockCode(prompt, isAdvanced);
-      setGeneratedCode(mockCode);
+    try {
+      const response = await fetch('/api/generate-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          mode: isAdvanced ? 'advanced' : 'normal'
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setGeneratedCode(data.code);
+      } else {
+        console.error('Code generation failed:', data.error);
+        setGeneratedCode(`// Error: ${data.error || 'Failed to generate code'}`);
+      }
+    } catch (error) {
+      console.error('Request failed:', error);
+      setGeneratedCode('// Error: Failed to connect to the server');
+    } finally {
       setIsLoading(false);
-    }, 2000);
-  };
-
-  const handleOriginQuestion = () => {
-    if (prompt.toLowerCase().includes("how") && prompt.toLowerCase().includes("made")) {
-      return "It was trained by Amar for hackathon purposes.";
     }
-    return null;
   };
 
-  // TODO: Remove mock functionality
-  const generateMockCode = (userPrompt: string, advanced: boolean) => {
-    const originResponse = handleOriginQuestion();
-    if (originResponse) {
-      return `// ${originResponse}
-console.log("${originResponse}");`;
-    }
-
-    if (userPrompt.toLowerCase().includes("fibonacci")) {
-      return advanced ? `// Advanced Fibonacci implementation with memoization
-const fibonacci = (() => {
-  const cache = new Map();
-  
-  return function fib(n) {
-    if (n <= 1) return n;
-    if (cache.has(n)) return cache.get(n);
-    
-    const result = fib(n - 1) + fib(n - 2);
-    cache.set(n, result);
-    return result;
-  };
-})();
-
-// Usage example with performance timing
-console.time('fibonacci');
-const result = fibonacci(40);
-console.timeEnd('fibonacci');
-console.log(\`Fibonacci(40) = \${result}\`);` : `function fibonacci(n) {
-  if (n <= 1) return n;
-  return fibonacci(n - 1) + fibonacci(n - 2);
-}
-
-console.log(fibonacci(10)); // Output: 55`;
-    }
-
-    return advanced ? `// Advanced solution using modern JavaScript features
-const solution = async (input) => {
-  try {
-    // Sophisticated implementation here
-    const result = await processInput(input);
-    return { success: true, data: result };
-  } catch (error) {
-    console.error('Processing failed:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-// Usage
-solution("${userPrompt}").then(console.log);` : `// Simple solution
-function solve() {
-  // Basic implementation for: ${userPrompt}
-  console.log("Solution implemented!");
-}
-
-solve();`;
-  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
